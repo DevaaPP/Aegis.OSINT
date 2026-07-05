@@ -12,6 +12,7 @@
     "db:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.10.2",
     "adm-zip": "^0.5.10",
     "axios": "^1.6.7",

@@ -14,7 +14,7 @@ export default function ScannerPage() {
 
   // Footprint Prober States
   const [target, setTarget] = useState('');
-  const [scanType, setScanType] = useState<'USERNAME' | 'EMAIL'>('USERNAME');
+  const [scanType, setScanType] = useState<'USERNAME' | 'EMAIL' | 'PHONE'>('USERNAME');
   const [loading, setLoading] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [error, setError] = useState('');
@@ -212,20 +212,27 @@ export default function ScannerPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-400 mb-2 uppercase font-mono tracking-wider">Scan Vector</label>
-                  <div className="flex gap-4">
+                  <div className="flex gap-2">
                     <button 
                       type="button"
                       onClick={() => setScanType('USERNAME')}
-                      className={`flex-1 py-2.5 text-xs font-bold font-mono border rounded-lg transition ${scanType === 'USERNAME' ? 'bg-cyber-blue/10 border-cyber-blue text-cyber-blue' : 'border-slate-800 text-slate-400 hover:bg-slate-900/30'}`}
+                      className={`flex-1 py-2 text-[10px] font-bold font-mono border rounded-lg transition ${scanType === 'USERNAME' ? 'bg-cyber-blue/10 border-cyber-blue text-cyber-blue' : 'border-slate-800 text-slate-400 hover:bg-slate-900/30'}`}
                     >
-                      Username Audit
+                      Username
                     </button>
                     <button 
                       type="button"
                       onClick={() => setScanType('EMAIL')}
-                      className={`flex-1 py-2.5 text-xs font-bold font-mono border rounded-lg transition ${scanType === 'EMAIL' ? 'bg-cyber-blue/10 border-cyber-blue text-cyber-blue' : 'border-slate-800 text-slate-400 hover:bg-slate-900/30'}`}
+                      className={`flex-1 py-2 text-[10px] font-bold font-mono border rounded-lg transition ${scanType === 'EMAIL' ? 'bg-cyber-blue/10 border-cyber-blue text-cyber-blue' : 'border-slate-800 text-slate-400 hover:bg-slate-900/30'}`}
                     >
-                      Email Address Audit
+                      Email
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setScanType('PHONE')}
+                      className={`flex-1 py-2 text-[10px] font-bold font-mono border rounded-lg transition ${scanType === 'PHONE' ? 'bg-cyber-blue/10 border-cyber-blue text-cyber-blue' : 'border-slate-800 text-slate-400 hover:bg-slate-900/30'}`}
+                    >
+                      Phone Number
                     </button>
                   </div>
                 </div>
@@ -239,7 +246,7 @@ export default function ScannerPage() {
                       value={target}
                       onChange={(e) => setTarget(e.target.value)}
                       required
-                      placeholder={scanType === 'USERNAME' ? 'e.g. johndoe_code' : 'name@domain.com'}
+                      placeholder={scanType === 'USERNAME' ? 'e.g. johndoe_code' : scanType === 'EMAIL' ? 'name@domain.com' : 'e.g. +91 99999 88888'}
                       className="w-full bg-slate-900/60 border border-slate-800 rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-cyber-blue text-white" 
                     />
                   </div>

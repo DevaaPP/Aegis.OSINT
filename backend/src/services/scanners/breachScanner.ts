@@ -67,21 +67,27 @@ const HISTORICAL_BREACHES: BreachInfo[] = [
   }
 ];
 
-export async function lookupBreaches(email: string): Promise<BreachInfo[]> {
-  const normalizedEmail = email.trim().toLowerCase();
+export async function lookupBreaches(target: string): Promise<BreachInfo[]> {
+  const normalizedTarget = target.trim().toLowerCase();
 
   // Preset mock accounts
-  if (normalizedEmail === 'admin@privacy.org') {
+  if (normalizedTarget === 'admin@privacy.org') {
     return []; // Admin account is clean
   }
 
-  if (normalizedEmail === 'user@privacy.org') {
+  if (normalizedTarget === 'user@privacy.org') {
     // Return a default breach for demonstration
     return [HISTORICAL_BREACHES[0], HISTORICAL_BREACHES[1]];
   }
 
+  // If the target is a phone number, return breaches that specifically leak phone numbers
+  const isPhone = /^[+\d\s-]{7,15}$/.test(normalizedTarget.replace(/[^\d]/g, ''));
+  if (isPhone) {
+    return [HISTORICAL_BREACHES[1], HISTORICAL_BREACHES[2]]; // LinkedIn and Truecaller leaks
+  }
+
   // Deterministic mapping: select breaches based on email hash so any search receives consistent results
-  const hash = crypto.createHash('sha256').update(normalizedEmail).digest('hex');
+  const hash = crypto.createHash('sha256').update(normalizedTarget).digest('hex');
   const count = (parseInt(hash.substring(0, 2), 16) % 3) + 1; // 1 to 3 breaches
   
   const selectedBreaches: BreachInfo[] = [];
