@@ -2,6 +2,7 @@ import { probeUsername, UsernameScanResult } from './usernameScanner';
 import { lookupBreaches, BreachInfo } from './breachScanner';
 import { scanGoogleAccount, GoogleProfile } from './ghuntScanner';
 import { scanFaceImage, ImageScanResult } from './faceScanner';
+import { scanPhoneNumber, PhoneInfoResult } from './phoneinfogaScanner';
 
 export interface GraphNode {
   id: string;
@@ -26,6 +27,7 @@ export interface RecursiveScanResult {
   breachResults: BreachInfo[];
   googleProfile: GoogleProfile | null;
   faceResults: ImageScanResult | null;
+  phoneInfo: PhoneInfoResult | null;
   graph: {
     nodes: GraphNode[];
     links: GraphLink[];
@@ -40,6 +42,7 @@ export async function runRecursiveScan(target: string, type: 'USERNAME' | 'EMAIL
   let breachResults: BreachInfo[] = [];
   let googleProfile: GoogleProfile | null = null;
   let faceResults: ImageScanResult | null = null;
+  let phoneInfo: PhoneInfoResult | null = null;
 
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
@@ -166,7 +169,41 @@ export async function runRecursiveScan(target: string, type: 'USERNAME' | 'EMAIL
       });
     });
 
-    // 2. Truecaller & India UPI mapping
+    // 2. PhoneInfoga Scanner
+    phoneInfo = await scanPhoneNumber(normalizedTarget);
+    if (phoneInfo.isValid) {
+      // Add Carrier Node
+      const carrierNodeId = `carrier_${phoneInfo.carrier.replace(/\s+/g, '_').toLowerCase()}`;
+      nodes.push({
+        id: carrierNodeId,
+        label: `Carrier: ${phoneInfo.carrier} (${phoneInfo.countryName})`,
+        type: 'PROFILE',
+        severity: 'INFO'
+      });
+      links.push({
+        source: phoneNodeId,
+        target: carrierNodeId,
+        relationship: 'NETWORK_OPERATOR'
+      });
+
+      // Add Dork Nodes (Maltego style relation representation!)
+      phoneInfo.googleDorks.slice(0, 3).forEach((dork, idx) => {
+        const dorkNodeId = `dork_${idx}`;
+        nodes.push({
+          id: dorkNodeId,
+          label: dork.title,
+          type: 'DOCUMENT',
+          severity: 'LOW'
+        });
+        links.push({
+          source: phoneNodeId,
+          target: dorkNodeId,
+          relationship: 'GOOGLE_DORK_LINK'
+        });
+      });
+    }
+
+    // 3. Truecaller & India UPI mapping
     const cleanNum = normalizedTarget.replace(/[^\d]/g, '');
     const isIndian = cleanNum.length >= 10 && (cleanNum.startsWith('91') || cleanNum.length === 10);
     
@@ -312,6 +349,7 @@ export async function runRecursiveScan(target: string, type: 'USERNAME' | 'EMAIL
     breachResults,
     googleProfile,
     faceResults,
+    phoneInfo,
     graph: {
       nodes,
       links

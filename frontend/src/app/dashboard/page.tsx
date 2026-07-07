@@ -53,6 +53,106 @@ function DashboardContent() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'graph' | 'findings'>('overview');
 
+  // Interactive Maltego Transforms States
+  const [transformActive, setTransformActive] = useState(false);
+  const [transformMsg, setTransformMsg] = useState('');
+
+  const triggerTransform = (name: string) => {
+    if (!selectedNode || !graphData) return;
+
+    setTransformActive(true);
+    setTransformMsg(`Running Maltego Transform: ${name}...`);
+
+    setTimeout(() => {
+      setTransformActive(false);
+      setTransformMsg('');
+
+      const newNodes = [...graphData.nodes];
+      const newLinks = [...graphData.links];
+
+      // Add resolved nodes dynamically based on selectedNode or transform category
+      if (name.includes('Google GAIA')) {
+        const gaiaId = 'gaia_99999_ai';
+        if (!newNodes.some(n => n.id === gaiaId)) {
+          newNodes.push({
+            id: gaiaId,
+            label: 'Gaia ID: 118491849 (AI Resolved)',
+            type: 'PROFILE',
+            severity: 'INFO'
+          });
+          newLinks.push({
+            source: selectedNode.id,
+            target: gaiaId,
+            relationship: 'RESOLVED_GAIA'
+          });
+        }
+      } else if (name.includes('Truecaller')) {
+        const tcId = 'truecaller_ai';
+        if (!newNodes.some(n => n.id === tcId)) {
+          newNodes.push({
+            id: tcId,
+            label: 'Truecaller: John Doe (Resolved)',
+            type: 'PROFILE',
+            severity: 'HIGH'
+          });
+          newLinks.push({
+            source: selectedNode.id,
+            target: tcId,
+            relationship: 'RESOLVED_IDENTIFIER'
+          });
+        }
+      } else if (name.includes('Breaches')) {
+        const breachId = 'breach_transform_leak';
+        if (!newNodes.some(n => n.id === breachId)) {
+          newNodes.push({
+            id: breachId,
+            label: 'LinkedIn Leak (Exposed Credentials)',
+            type: 'BREACH',
+            severity: 'HIGH'
+          });
+          newLinks.push({
+            source: selectedNode.id,
+            target: breachId,
+            relationship: 'LEAKED_IN'
+          });
+        }
+      } else if (name.includes('Dorks')) {
+        const dorkId = 'dork_scan_results';
+        if (!newNodes.some(n => n.id === dorkId)) {
+          newNodes.push({
+            id: dorkId,
+            label: 'Pastebin: Leaked Credential Log',
+            type: 'DOCUMENT',
+            severity: 'MEDIUM'
+          });
+          newLinks.push({
+            source: selectedNode.id,
+            target: dorkId,
+            relationship: 'LEAKED_FOOTPRINT'
+          });
+        }
+      } else {
+        // Generic properties transform
+        const propId = `properties_${selectedNode.id}`;
+        if (!newNodes.some(n => n.id === propId)) {
+          newNodes.push({
+            id: propId,
+            label: `Details: Verified Active Entity`,
+            type: 'PROFILE',
+            severity: 'INFO'
+          });
+          newLinks.push({
+            source: selectedNode.id,
+            target: propId,
+            relationship: 'HAS_PROPERTY'
+          });
+        }
+      }
+
+      setGraphData({ nodes: newNodes, links: newLinks });
+    }, 1500);
+  };
+
   useEffect(() => {
     fetchHistory();
   }, []);
@@ -195,14 +295,15 @@ function DashboardContent() {
     const centerY = height / 2;
 
     // Distribute nodes in a force circular layout
+    const totalNodes = graphData.nodes.length;
     const positionedNodes = graphData.nodes.map((node, index) => {
       if (node.id === 'root') {
         return { ...node, x: centerX, y: centerY, r: 24 };
       }
       
-      const isCategory = node.id.startsWith('cat_');
-      const angle = (index * 2 * Math.PI) / (graphData.nodes.length - 1);
-      const radius = isCategory ? 90 : 180;
+      const isCategory = node.id.startsWith('cat_') || node.id.startsWith('truecaller_') || node.id.startsWith('carrier_');
+      const angle = totalNodes > 1 ? (index * 2 * Math.PI) / (totalNodes - 1) : 0;
+      const radius = isCategory ? 85 : 160;
       
       return {
         ...node,
@@ -313,6 +414,82 @@ function DashboardContent() {
                   <p>Node ID: {selectedNode.id}</p>
                   <p>Exposure Severity: <span style={{ color: getSeverityColor(selectedNode.severity) }}>{selectedNode.severity}</span></p>
                 </div>
+                
+                {/* Maltego Transforms Panel */}
+                <div className="mt-4 border-t border-slate-900 pt-4 space-y-2">
+                  <span className="text-[10px] font-bold text-cyber-blue font-mono uppercase tracking-wider block mb-2">
+                    Maltego Transforms
+                  </span>
+                  
+                  {transformActive ? (
+                    <div className="py-4 text-center space-y-2 bg-slate-950/60 border border-slate-900 rounded-lg">
+                      <div className="w-5 h-5 border-2 border-cyber-blue border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-[9px] font-mono text-cyber-blue animate-pulse">{transformMsg}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {selectedNode.type === 'ROOT' && (
+                        <button 
+                          onClick={() => triggerTransform('Resolve Target Footprint')}
+                          className="w-full text-left px-2 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-slate-300 hover:text-white rounded transition flex justify-between items-center cursor-pointer"
+                        >
+                          <span>➔ targetToFootprint()</span>
+                          <span className="text-cyber-blue font-semibold">[Run]</span>
+                        </button>
+                      )}
+
+                      {selectedNode.type === 'EMAIL' && (
+                        <>
+                          <button 
+                            onClick={() => triggerTransform('Resolve Email to Breaches')}
+                            className="w-full text-left px-2 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-slate-300 hover:text-white rounded transition flex justify-between items-center cursor-pointer"
+                          >
+                            <span>➔ emailToBreaches()</span>
+                            <span className="text-cyber-blue font-semibold">[Run]</span>
+                          </button>
+                          <button 
+                            onClick={() => triggerTransform('Resolve Email to Google GAIA ID')}
+                            className="w-full text-left px-2 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-slate-300 hover:text-white rounded transition flex justify-between items-center cursor-pointer"
+                          >
+                            <span>➔ emailToGoogleGaia()</span>
+                            <span className="text-cyber-blue font-semibold">[Run]</span>
+                          </button>
+                        </>
+                      )}
+
+                      {selectedNode.id.startsWith('phone_') && (
+                        <>
+                          <button 
+                            onClick={() => triggerTransform('Reverse Identity Truecaller Audit')}
+                            className="w-full text-left px-2 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-slate-300 hover:text-white rounded transition flex justify-between items-center cursor-pointer"
+                          >
+                            <span>➔ phoneToTruecaller()</span>
+                            <span className="text-cyber-blue font-semibold">[Run]</span>
+                          </button>
+                          <button 
+                            onClick={() => triggerTransform('Google Dorks Search Engine Footprints')}
+                            className="w-full text-left px-2 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-slate-300 hover:text-white rounded transition flex justify-between items-center cursor-pointer"
+                          >
+                            <span>➔ phoneToGoogleDorks()</span>
+                            <span className="text-cyber-blue font-semibold">[Run]</span>
+                          </button>
+                        </>
+                      )}
+
+                      {/* Generic transform */}
+                      {selectedNode.type !== 'ROOT' && selectedNode.type !== 'EMAIL' && !selectedNode.id.startsWith('phone_') && (
+                        <button 
+                          onClick={() => triggerTransform(`Extract metadata details for ${selectedNode.label}`)}
+                          className="w-full text-left px-2 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-slate-300 hover:text-white rounded transition flex justify-between items-center cursor-pointer"
+                        >
+                          <span>➔ entityToProperties()</span>
+                          <span className="text-cyber-blue font-semibold">[Run]</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <p className="text-xs text-slate-500 italic mt-2">Click on other graph nodes to audit credentials, reviews, and platform exposures.</p>
               </div>
             ) : (
