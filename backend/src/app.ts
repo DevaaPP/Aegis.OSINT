@@ -69,7 +69,7 @@ app.get('/api/admin/feedback', requireAdmin, admin.getFeedback);
 app.delete('/api/admin/feedback/:id', requireAdmin, admin.deleteFeedback);
 
 // Health Check Endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({ success: true, status: 'API operational', timestamp: new Date() });
 });
 

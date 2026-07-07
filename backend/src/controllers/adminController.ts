@@ -3,7 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import prisma from '../services/db';
 import * as os from 'os';
 
-export async function getSystemStats(req: AuthRequest, res: Response) {
+export async function getSystemStats(_req: AuthRequest, res: Response) {
   try {
     // DB Queries
     const userCount = await prisma.user.count();
@@ -46,7 +46,7 @@ export async function getSystemStats(req: AuthRequest, res: Response) {
   }
 }
 
-export async function getUsers(req: AuthRequest, res: Response) {
+export async function getUsers(_req: AuthRequest, res: Response) {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -68,7 +68,7 @@ export async function getUsers(req: AuthRequest, res: Response) {
   }
 }
 
-export async function getAuditLogs(req: AuthRequest, res: Response) {
+export async function getAuditLogs(_req: AuthRequest, res: Response) {
   try {
     const logs = await prisma.auditLog.findMany({
       include: {
@@ -127,7 +127,7 @@ export async function submitFeedback(req: Request | any, res: Response) {
   }
 }
 
-export async function getFeedback(req: AuthRequest, res: Response) {
+export async function getFeedback(_req: AuthRequest, res: Response) {
   try {
     const feedbackList = await prisma.feedback.findMany({
       orderBy: { createdAt: 'desc' }

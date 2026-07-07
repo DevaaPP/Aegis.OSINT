@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import prisma from '../services/db';
+import { CONFIG } from '../config';
 import { runRecursiveScan } from '../services/scanners/recursiveMapper';
 import { parseExif, stripExif } from '../services/scanners/exifParser';
 import { parseDocx, stripDocx } from '../services/scanners/docxParser';

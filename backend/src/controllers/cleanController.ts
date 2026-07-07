@@ -33,7 +33,7 @@ const DATA_BROKERS = [
   { name: 'Justdial', jurisdiction: 'India', optOutUrl: 'https://justdial.com/support/contactus', category: 'Local Directory' }
 ];
 
-export async function getDataBrokersList(req: AuthRequest, res: Response) {
+export async function getDataBrokersList(_req: AuthRequest, res: Response) {
   try {
     return res.status(200).json({ success: true, brokers: DATA_BROKERS });
   } catch (error) {

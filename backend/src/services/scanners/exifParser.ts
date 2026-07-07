@@ -7,6 +7,9 @@ export interface ExifData {
     latitude: number;
     longitude: number;
     altitude?: number;
+    locationName?: string;
+    aiEstimated?: boolean;
+    reason?: string;
   };
   hasExif: boolean;
 }

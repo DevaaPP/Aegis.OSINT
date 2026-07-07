@@ -13,7 +13,8 @@ export interface AuthRequest extends Request {
 export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: 'Authorization token required' });
+    res.status(401).json({ success: false, message: 'Authorization token required' });
+    return;
   }
 
   const token = authHeader.split(' ')[1];
@@ -26,18 +27,21 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid or expired authorization token' });
+    res.status(401).json({ success: false, message: 'Invalid or expired authorization token' });
+    return;
   }
 }
 
 export function requireRole(roles: ('USER' | 'ADMIN')[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Forbidden: Insufficient privileges' });
+      res.status(403).json({ success: false, message: 'Forbidden: Insufficient privileges' });
+      return;
     }
 
     next();

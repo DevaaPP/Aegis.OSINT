@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { CONFIG } from '../config';
 import { z } from 'zod';
+import * as crypto from 'crypto';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -62,7 +63,7 @@ export async function register(req: AuthRequest, res: Response) {
     });
 
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, CONFIG.JWT_SECRET, {
-      expiresIn: CONFIG.JWT_EXPIRES_IN
+      expiresIn: CONFIG.JWT_EXPIRES_IN as any
     });
 
     return res.status(201).json({
@@ -104,7 +105,7 @@ export async function login(req: AuthRequest, res: Response) {
     });
 
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, CONFIG.JWT_SECRET, {
-      expiresIn: CONFIG.JWT_EXPIRES_IN
+      expiresIn: CONFIG.JWT_EXPIRES_IN as any
     });
 
     return res.status(200).json({
