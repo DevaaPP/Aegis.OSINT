@@ -364,12 +364,37 @@ function compileFindings(scan: any, scanId: string): any[] {
       scanId,
       category: 'Data Breach',
       severity: b.severity,
-      title: `Email credentials leaked in ${b.name}`,
+      title: `Credentials leaked in ${b.name}`,
       description: `Breach on ${b.breachDate} exposed: ${b.exposedData.join(', ')}. Details: ${b.description}`,
       remediation: b.remediation,
       rawJson: JSON.stringify(b)
     });
   });
+
+  // Phone OSINT exposures (PhoneInfoga)
+  if (scan.phoneInfo && scan.phoneInfo.isValid) {
+    findings.push({
+      scanId,
+      category: 'Phone Directory Info',
+      severity: 'INFO',
+      title: `Telecom network operator: ${scan.phoneInfo.carrier}`,
+      description: `Target identified as active line in ${scan.phoneInfo.countryName} (Country Code: ${scan.phoneInfo.countryCode}). Format: ${scan.phoneInfo.formattedInternational}.`,
+      remediation: `Use unlisting templates or opt-out from data brokers to de-link name and operator footprints.`,
+      rawJson: JSON.stringify(scan.phoneInfo)
+    });
+
+    scan.phoneInfo.googleDorks.slice(0, 3).forEach((dork: any) => {
+      findings.push({
+        scanId,
+        category: 'Phone Footprint Leak',
+        severity: 'MEDIUM',
+        title: `Search dork index: ${dork.title}`,
+        description: `Visual reference dork generated: ${dork.dork}.`,
+        remediation: `Inspect if third-party directories or public files are exposing this contact. Dork Link: ${dork.searchUrl}`,
+        rawJson: JSON.stringify(dork)
+      });
+    });
+  }
 
   // Google Account exposures
   if (scan.googleProfile) {
