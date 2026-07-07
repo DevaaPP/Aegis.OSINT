@@ -1,0 +1,221 @@
+name: CI — OSINT Intelligence Platform
+
+on:
+  push:
+    branches: [main, dev, "feature/**"]
+  pull_request:
+    branches: [main, dev]
+
+# Cancel any in-progress run for the same ref (saves CI minutes)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  POSTGRES_DB: privacy_db_ci
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/privacy_db_ci?schema=public
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1 — Backend: Type-check, Tests, Build
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Generate Prisma client before any TypeScript compilation
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      # Push schema directly in CI (no migration history needed)
+      - name: Apply database schema
+        run: npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      # TypeScript strict type-check — catches type errors without emitting
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      # Core parser unit tests (EXIF, PDF)
+      - name: Run parser unit tests
+        run: npm test
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      # Intelligence module smoke tests (evidenceTypes + phoneIntel)
+      - name: Run intelligence module smoke tests
+        run: npm run test:intelligence
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          # No APILAYER_KEY / NUMVERIFY_KEY set intentionally:
+          # phoneIntel gracefully degrades to FORMAT_ONLY mode in CI
+
+      # Compile TypeScript to JS — validates the full build
+      - name: Build TypeScript
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
+      # Upload compiled dist as artifact for Docker job
+      - name: Upload backend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: backend/dist/
+          retention-days: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2 — Frontend: Type-check, Lint, Build
+# ─────────────────────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Next.js production build (Turbopack) — validates all pages compile
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          # Dummy values so env references in Next.js don't fail at build time
+          NEXT_PUBLIC_API_URL: http://localhost:4000/api
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/.next/
+          retention-days: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3 — Docker: Build images (no push unless on main)
+# ─────────────────────────────────────────────────────────────────────────────
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    # Only build Docker images after both CI jobs pass
+    if: success()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GHCR only on pushes to main (not PRs)
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/osint-backend:latest
+            ghcr.io/${{ github.repository_owner }}/osint-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/osint-frontend:latest
+            ghcr.io/${{ github.repository_owner }}/osint-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 4 — Security: Dependency audit
+# ─────────────────────────────────────────────────────────────────────────────
+  security:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    # Run in parallel with backend/frontend — don't block CI on audit warnings
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Audit backend dependencies
+        run: npm audit --audit-level=high
+        working-directory: backend
+        continue-on-error: true
+
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+        working-directory: frontend
+        continue-on-error: true
